@@ -8,10 +8,10 @@ using namespace Rcpp;
 
 // [[Rcpp::export]]
 List cpp_lda(arma::sp_mat &mt, int k, int max_iter, double alpha, double beta,
-                  arma::sp_mat &seeds, int seed, bool verbose) {
+                  arma::sp_mat &seeds, bool verbose) {
     LDA lda;
     lda.set_data(mt);
-    lda.seed = seed;
+    lda.seed = floor(Rcpp::runif(1)[0] * std::numeric_limits<int>::max());
     lda.K = k;
     if (max_iter > 0)
         lda.niters = max_iter;

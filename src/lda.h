@@ -55,12 +55,12 @@ class LDA {
         bool verbose; // print progress messages
 
         arma::sp_mat data; // transposed document-feature matrix
-        arma::vec p; // temp variable for sampling
+        arma::rowvec p; // temp variable for sampling
         Texts z; // topic assignments for words, size M x doc.size()
-        arma::umat nw; // cwt[i][j]: number of instances of word/term i assigned to topic j, size V x K
-        arma::umat nd; // na[i][j]: number of words in document i assigned to topic j, size M x K
-        arma::urowvec nwsum; // nwsum[j]: total number of words assigned to topic j, size K
-        arma::ucolvec ndsum; // nasum[i]: total number of words in document i, size M
+        arma::mat nw; // cwt[i][j]: number of instances of word/term i assigned to topic j, size V x K
+        arma::mat nd; // na[i][j]: number of words in document i assigned to topic j, size M x K
+        arma::rowvec nwsum; // nwsum[j]: total number of words assigned to topic j, size K
+        arma::rowvec ndsum; // nasum[i]: total number of words in document i, size M
         arma::mat theta; // theta: document-topic distributions, size M x K
         arma::mat phi; // phi: topic-word distributions, size K x V
 
@@ -124,14 +124,14 @@ int LDA::init_est() {
 
     z = Texts(M);
 
-    p = arma::vec(K);
+    p = arma::rowvec(K);
     theta = arma::mat(M, K, arma::fill::zeros);
     phi = arma::mat(K, V, arma::fill::zeros);
 
-    nw = arma::umat(V, K, arma::fill::zeros);
-    nd = arma::umat(M, K, arma::fill::zeros);
-    nwsum = arma::urowvec(K, arma::fill::zeros);
-    ndsum = arma::conv_to<arma::ucolvec>::from(arma::mat(arma::sum(data, 0)));
+    nw = arma::mat(V, K, arma::fill::zeros);
+    nd = arma::mat(M, K, arma::fill::zeros);
+    nwsum = arma::rowvec(K, arma::fill::zeros);
+    ndsum = arma::mat(arma::sum(data, 0));
 
     //dev::Timer timer;
     //dev::start_timer("Set z", timer);
@@ -215,14 +215,23 @@ int LDA::sampling(int m, int n, int w) {
     double Vbeta = V * beta;
     double Kalpha = K * alpha;
     // do multinomial sampling via cumulative method
-    for (int k = 0; k < K; k++) {
-        p[k] = (nw.at(w, k) + beta) / (nwsum[k] + Vbeta) *
-               (nd.at(m, k) + alpha) / (ndsum[m] + Kalpha);
-    }
+    // for (int k = 0; k < K; k++) {
+    //     p[k] = (nw.at(w, k) + beta) / (nwsum[k] + Vbeta) *
+    //            (nd.at(m, k) + alpha) / (ndsum[m] + Kalpha);
+    // }
+
+    //arma::rowvec vw = arma::conv_to<arma::rowvec>::from(nw.row(w));
+    //arma::rowvec vd = arma::conv_to<arma::rowvec>::from(nd.row(m));
+    //arma::rowvec vw = nw.row(w);
+    //arma::rowvec vd = nd.row(m);
+    p = ((nw.row(w) + beta) / (nwsum + Vbeta)) % ((nd.row(m) + alpha) / (ndsum[m] + Kalpha));
+
     // cumulate multinomial parameters
     for (int k = 1; k < K; k++) {
         p[k] += p[k - 1];
     }
+    if (p[K - 1] > 1)
+        Rcout << "doc " << m << ", token " << n << "\n";
     // scaled sample because of unnormalized p[]
     double u = random_prob(generator) * p[K - 1];
 
